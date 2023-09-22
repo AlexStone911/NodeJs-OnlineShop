@@ -1,9 +1,12 @@
 const Product = require("../models/product");
+const { validationResult } = require("express-validator");
 
 exports.getAddProduct = (req, res, next) => {
 	res.render("admin/edit-product", {
 		pageTitle: "Add Product",
+		errorMessage: null,
 		path: "/admin/add-product",
+		validationErrors: [],
 		editing: false,
 	});
 };
@@ -13,6 +16,25 @@ exports.postAddProduct = (req, res, next) => {
 	const imageUrl = req.body.imageUrl;
 	const price = req.body.price;
 	const description = req.body.description;
+	const errors = validationResult(req);
+
+	if (!errors.isEmpty()) {
+		return res.status(422).render("admin/edit-product", {
+			path: "/admin/edit-product",
+			pageTitle: "Add Product",
+			errorMessage: errors.array()[0].msg,
+			editing: false,
+			hasError: true,
+			validationErrors: errors.array(),
+			product: {
+				title,
+				imageUrl,
+				price,
+				description,
+			},
+		});
+	}
+
 	const product = new Product({
 		title: title,
 		price: price,
@@ -46,6 +68,9 @@ exports.getEditProduct = (req, res, next) => {
 				pageTitle: "Edit Product",
 				path: "/admin/edit-product",
 				editing: editMode,
+				validationErrors: [],
+				hasError: true,
+				errorMessage: null,
 				product: product,
 			});
 		})
@@ -58,12 +83,28 @@ exports.postEditProduct = (req, res, next) => {
 	const updatedPrice = req.body.price;
 	const updatedImageUrl = req.body.imageUrl;
 	const updatedDesc = req.body.description;
+	const errors = validationResult(req);
+
+	if (!errors.isEmpty()) {
+		return res.status(422).render("admin/edit-product", {
+			path: "/admin/edit-product",
+			pageTitle: "Edit Product",
+			errorMessage: errors.array()[0].msg,
+			editing: true,
+			validationErrors: errors.array(),
+			hasError: true,
+			product: {
+				title: updatedTitle,
+				imageUrl: updatedImageUrl,
+				price: updatedPrice,
+				description: updatedDesc,
+				_id: prodId,
+			},
+		});
+	}
 
 	Product.findById(prodId)
 		.then((product) => {
-			if (product.userId !== req.user._id) {
-				return res.redirect("/");
-			}
 			product.title = updatedTitle;
 			product.price = updatedPrice;
 			product.description = updatedDesc;
@@ -71,8 +112,7 @@ exports.postEditProduct = (req, res, next) => {
 			return product.save();
 		})
 		.then((result) => {
-			console.log("UPDATED PRODUCT!");
-			res.redirect("/admin/products");
+			return res.redirect("/admin/products");
 		})
 		.catch((err) => console.log(err));
 };

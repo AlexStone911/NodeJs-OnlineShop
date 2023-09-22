@@ -3,6 +3,8 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const sendgridTransport = require("nodemailer-sendgrid-transport");
+const { validationResult } = require("express-validator");
+const { error } = require("console");
 
 const transporter = nodemailer.createTransport(
 	sendgridTransport({
@@ -23,13 +25,35 @@ exports.getLogin = (req, res, next) => {
 	res.render("auth/login", {
 		path: "/login",
 		pageTitle: "Login",
+		validationErrors: [],
 		errorMessage: message,
+		oldInput: {
+			name: "",
+			email: "",
+			password: "",
+			confirmPassword: "",
+		},
 	});
 };
 
 exports.postLogin = (req, res, next) => {
 	const email = req.body.email;
 	const password = req.body.password;
+	const errors = validationResult(req);
+
+	if (!errors.isEmpty()) {
+		console.log(errors);
+		return res.status(422).render("auth/login", {
+			path: "/login",
+			pageTitle: "Login",
+			errorMessage: errors.array()[0].msg,
+			validationErrors: errors.array(),
+			oldInput: {
+				email: email,
+				password: password,
+			},
+		});
+	}
 
 	User.findOne({ email: email })
 		.then((user) => {
@@ -51,7 +75,16 @@ exports.postLogin = (req, res, next) => {
 							res.redirect("/");
 						});
 					}
-					res.redirect("/login");
+					return res.status(422).render("auth/login", {
+						path: "/login",
+						pageTitle: "Login",
+						errorMessage: "Incorrect email or password",
+						validationErrors: [],
+						oldInput: {
+							email: email,
+							password: password,
+						},
+					});
 				})
 				.catch((err) => {
 					console.log(err);
@@ -72,6 +105,14 @@ exports.getSignup = (req, res, next) => {
 	res.render("auth/signup", {
 		path: "/signup",
 		pageTitle: "Signup",
+		errorMessage: "",
+		oldInput: {
+			name: "",
+			email: "",
+			password: "",
+			confirmPassword: "",
+		},
+		validationErrors: [],
 	});
 };
 
@@ -80,7 +121,21 @@ exports.postSignup = (req, res, next) => {
 	const name = req.body.name;
 	const password = req.body.password;
 	const confirmPassword = req.body.confirmPassword;
-
+	const errors = validationResult(req);
+	if (!errors.isEmpty()) {
+		return res.status(422).render("auth/signup", {
+			path: "/signup",
+			pageTitle: "Signup",
+			errorMessage: errors.array()[0].msg,
+			oldInput: {
+				name: name,
+				email: email,
+				password: password,
+				confirmPassword: confirmPassword,
+			},
+			validationErrors: errors.array(),
+		});
+	}
 	User.findOne({ email: email })
 		.then((userDoc) => {
 			if (userDoc) {
